@@ -12,9 +12,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var server = "mongodb://127.0.0.1:15000"
+// var server = "mongodb://127.0.0.1:15000" mongodb+srv://testdb:testdb@cluster0.2xffgea.mongodb.net/?retryWrites=true&w=majority
+var server = "mongodb+srv://testdb:testdb@cluster0.2xffgea.mongodb.net/?retryWrites=true&w=majority"
 
-func UpdateArchive(ctx context.Context, db_mongo_u string, collec_u string, input1 bson.M, input2 bson.M) string {
+func Updateonly(ctx context.Context, db_mongo_u string, collec_u string, input1 bson.M, input2 bson.M) string {
 
 	time := time.Now().Add(time.Minute).Unix()
 	clientOptions_u := options.Client().ApplyURI(server)
@@ -59,6 +60,54 @@ func UpdateArchive(ctx context.Context, db_mongo_u string, collec_u string, inpu
 	}
 	fmt.Println(res_u)
 	return `ok`
+}
+
+func UpdateArchive(ctx context.Context, db_mongo_u string, collec_u string, input1 bson.M, input2 bson.M) string {
+
+	time := time.Now().Add(time.Minute).Unix()
+	clientOptions_u := options.Client().ApplyURI(server)
+	client_u, err := mongo.Connect(ctx, clientOptions_u)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = client_u.Ping(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client_u.Disconnect(ctx)
+
+	collection_u := client_u.Database(db_mongo_u).Collection(collec_u)
+	collection_i := client_u.Database(db_mongo_u).Collection(collec_u + `_Archive`)
+
+	//cur, currErr := collection.Find(ctx, bson.M{})
+	cur, currErr := collection_u.Find(ctx, input1)
+	if currErr != nil {
+		panic(currErr)
+	}
+	// fmt.Println(cur)
+
+	var msg []bson.M
+
+	if err = cur.All(ctx, &msg); err != nil {
+		panic(err)
+	}
+	fmt.Println(msg)
+
+	delete(msg[0], "_id")
+
+	res_i, insertErr := collection_i.InsertOne(ctx, msg[0])
+	if insertErr != nil {
+		return `nok`
+	}
+	fmt.Println(res_i)
+	input2[`timestamp`] = time
+	res_u, insertErr := collection_u.UpdateOne(ctx, input1, bson.M{"$set": input2})
+	if insertErr != nil {
+		return `nok`
+	}
+	fmt.Println(res_u)
+	return `ok`
+
 }
 
 func Insertdb(ctx context.Context, db_mongo_u string, collec_u string, input1 bson.M) string {
